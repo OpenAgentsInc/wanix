@@ -60,7 +60,10 @@ func serveCmd() *cli.Command {
 
 				http.FileServerFS(fsys).ServeHTTP(w, r)
 			}))
-			http.ListenAndServe(listenAddr, nil)
+			log.Printf("Server listening. Check browser console (F12) for debug output.\n")
+			if err := http.ListenAndServe(listenAddr, nil); err != nil {
+				log.Fatal("Server error:", err)
+			}
 		},
 	}
 	cmd.Flags().StringVar(&listenAddr, "listen", ":7654", "addr to serve on")

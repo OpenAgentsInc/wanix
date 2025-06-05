@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Node Service</title>
+</head>
+<body>
+    <h1>Node Service Test</h1>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            output.textContent += msg + '\n';
+        }
+        
+        log('Loading Wanix...');
+        
+        try {
+            // Import Wanix
+            const { Wanix } = await import('http://localhost:7654/wanix.js');
+            
+            log('Wanix loaded, initializing...');
+            
+            // Initialize Wanix
+            const wanix = await Wanix.init();
+            
+            log('Wanix initialized, testing node service...');
+            
+            // Check if /web/node exists
+            try {
+                const entries = await wanix.readdir('/web/node');
+                log('SUCCESS: /web/node directory found!');
+                log('Contents: ' + entries.join(', '));
+                
+                // Try to read bootstrap.js
+                try {
+                    const content = await wanix.readFile('/web/node/bootstrap.js', 'utf8');
+                    log('SUCCESS: bootstrap.js readable, length: ' + content.length);
+                    
+                    // Show first 100 chars
+                    log('First 100 chars: ' + content.substring(0, 100) + '...');
+                } catch (e) {
+                    log('ERROR reading bootstrap.js: ' + e.message);
+                }
+            } catch (e) {
+                log('ERROR: Could not access /web/node: ' + e.message);
+            }
+            
+        } catch (e) {
+            log('ERROR: ' + e.message);
+            console.error(e);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Test script with delays and debugging
+
+echo "=== Node.js Task Test ===" >&2
+
+# Step 1: Create task
+echo "1. Creating nodejs task..." >&2
+TASK_ID=$(cat /task/new/nodejs)
+echo "   Got task ID: $TASK_ID" >&2
+
+# Step 2: Wait a moment
+echo "2. Waiting 1 second..." >&2
+sleep 1
+
+# Step 3: Check if task exists
+echo "3. Listing /task/ directory:" >&2
+ls /task/ >&2
+
+# Step 4: Check task directory
+echo "4. Checking if /task/$TASK_ID exists:" >&2
+if [ -d "/task/$TASK_ID" ]; then
+    echo "   Directory exists!" >&2
+    echo "   Contents:" >&2
+    ls /task/$TASK_ID >&2
+else
+    echo "   Directory NOT FOUND!" >&2
+fi
+
+# Step 5: Try to read cmd
+echo "5. Trying to read cmd file:" >&2
+cat /task/$TASK_ID/cmd >&2 2>&1
+
+# Step 6: Try to write to cmd
+echo "6. Trying to write to cmd file:" >&2
+echo "console.log('test');" > /task/$TASK_ID/cmd 2>&1
+if [ $? -eq 0 ]; then
+    echo "   Write successful!" >&2
+else
+    echo "   Write FAILED!" >&2
+fi
+
+echo "=== Test Complete ===" >&2

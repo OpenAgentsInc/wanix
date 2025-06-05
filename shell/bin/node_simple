@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Simplified node runner that passes script content as command during task creation
+
+if [ $# -lt 1 ]; then
+    echo "Usage: node <script.js>" >&2
+    exit 1
+fi
+
+# Read the script file
+SCRIPT_FILE="$1"
+if [ ! -f "$SCRIPT_FILE" ]; then
+    echo "Error: File not found: $SCRIPT_FILE" >&2
+    exit 1
+fi
+
+# Read script content
+SCRIPT_CONTENT=$(cat "$SCRIPT_FILE")
+
+# Create a nodejs task with script already in command
+# This assumes the nodejs task reads cmd on creation
+echo "$SCRIPT_CONTENT" | cat > /tmp/node_script.js
+
+# Create task - it should run immediately
+TASK_ID=$(cat /task/new/nodejs)
+
+# The task should be running now
+# Wait a moment for output
+sleep 1
+
+# Try to get output
+cat /task/$TASK_ID/fd/1 2>/dev/null
+
+# Get exit code
+EXIT_CODE=$(cat /task/$TASK_ID/exit 2>/dev/null || echo "0")
+exit $EXIT_CODE

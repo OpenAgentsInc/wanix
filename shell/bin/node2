@@ -1,0 +1,71 @@
+#!/bin/sh
+
+# Alternative node implementation that passes file path instead of content
+
+if [ $# -lt 1 ]; then
+    echo "Usage: node <script.js>" >&2
+    exit 1
+fi
+
+# Get absolute path to script file
+SCRIPT_FILE="$1"
+if [ ! -f "$SCRIPT_FILE" ]; then
+    echo "Error: File not found: $SCRIPT_FILE" >&2
+    exit 1
+fi
+
+# Get absolute path
+if [ "${SCRIPT_FILE#/}" = "$SCRIPT_FILE" ]; then
+    # Relative path - prepend current directory
+    SCRIPT_FILE="$(pwd)/$SCRIPT_FILE"
+fi
+
+# Create a nodejs task and pass the file path as cmd
+echo "Running Node.js script: $SCRIPT_FILE" >&2
+
+# This writes the file path to a temp file first
+echo "$SCRIPT_FILE" > /tmp/node_cmd
+
+# Create task
+TASK_ID=$(cat /task/new/nodejs)
+
+# Now try to set cmd by reading from temp file
+cat /tmp/node_cmd > /task/$TASK_ID/cmd 2>&1 || {
+    echo "Failed to set command, trying alternative approach..." >&2
+    
+    # Alternative: Create a new task with the path already set
+    # This requires modifying how we create tasks
+    echo "ERROR: Cannot set task command" >&2
+    exit 1
+}
+
+# Start the task
+echo "start" > /task/$TASK_ID/ctl 2>&1 || {
+    echo "Failed to start task" >&2
+    exit 1
+}
+
+# Connect output streams
+(
+    while true; do
+        cat /task/$TASK_ID/fd/1 2>/dev/null || break
+    done
+) &
+STDOUT_PID=$!
+
+(
+    while true; do
+        cat /task/$TASK_ID/fd/2 2>/dev/null >&2 || break
+    done
+) &
+STDERR_PID=$!
+
+# Wait for task
+cat /task/$TASK_ID/wait >/dev/null 2>&1
+
+# Cleanup
+kill $STDOUT_PID $STDERR_PID 2>/dev/null
+
+# Get exit code
+EXIT_CODE=$(cat /task/$TASK_ID/exit 2>/dev/null || echo "1")
+exit $EXIT_CODE

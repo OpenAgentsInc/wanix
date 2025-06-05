@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Node.js MVP Test</title>
+</head>
+<body>
+    <h1>Node.js MVP Direct Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function testNodeJS() {
+            const output = document.getElementById('output');
+            
+            output.textContent = "Testing Node.js MVP directly...\n\n";
+            
+            // Test 1: Check if nodejs task type exists
+            output.textContent += "1. Checking /task/new/nodejs...\n";
+            try {
+                const resp = await fetch('/task/new/nodejs');
+                if (resp.ok) {
+                    output.textContent += "   ✓ nodejs task type exists\n";
+                } else {
+                    output.textContent += "   ✗ Failed: " + resp.statusText + "\n";
+                }
+            } catch (e) {
+                output.textContent += "   ✗ Error: " + e + "\n";
+            }
+            
+            // Test 2: Check if /web/node/ is mounted
+            output.textContent += "\n2. Checking /web/node/bootstrap.js...\n";
+            try {
+                const resp = await fetch('/web/node/bootstrap.js');
+                if (resp.ok) {
+                    const text = await resp.text();
+                    output.textContent += "   ✓ bootstrap.js exists (" + text.length + " bytes)\n";
+                } else {
+                    output.textContent += "   ✗ Failed: " + resp.statusText + "\n";
+                }
+            } catch (e) {
+                output.textContent += "   ✗ Error: " + e + "\n";
+            }
+            
+            // Test 3: Create nodejs-test task
+            output.textContent += "\n3. Creating nodejs-test task...\n";
+            output.textContent += "   Check browser console for output!\n";
+            
+            // This will run in Wanix context
+            output.textContent += "\n=== Open Browser Console (F12) to see WASM logs ===\n";
+        }
+        
+        testNodeJS();
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# Node runner that pipes script to stdin instead of using cmd
+
+if [ $# -lt 1 ]; then
+    echo "Usage: node <script.js>" >&2
+    exit 1
+fi
+
+# Read the script file
+SCRIPT_FILE="$1"
+if [ ! -f "$SCRIPT_FILE" ]; then
+    echo "Error: File not found: $SCRIPT_FILE" >&2
+    exit 1
+fi
+
+# Create a nodejs task
+TASK_ID=$(cat /task/new/nodejs)
+
+# Don't set cmd - let it read from stdin
+# Just start the task with script piped to stdin
+(
+    cat "$SCRIPT_FILE" > /task/$TASK_ID/fd/0
+    echo "start" > /task/$TASK_ID/ctl
+) &
+
+# Connect output streams
+(
+    while true; do
+        cat /task/$TASK_ID/fd/1 2>/dev/null || break
+    done
+) &
+STDOUT_PID=$!
+
+(
+    while true; do
+        cat /task/$TASK_ID/fd/2 2>/dev/null >&2 || break
+    done
+) &
+STDERR_PID=$!
+
+# Wait for task
+cat /task/$TASK_ID/wait >/dev/null 2>&1
+
+# Cleanup
+kill $STDOUT_PID $STDERR_PID 2>/dev/null
+
+# Get exit code
+EXIT_CODE=$(cat /task/$TASK_ID/exit 2>/dev/null || echo "1")
+exit $EXIT_CODE

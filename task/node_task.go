@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"strings"
 	"syscall/js"
 )
 
@@ -23,12 +24,36 @@ func NewNodeTask(res *Resource) *NodeTask {
 
 // Start executes the JavaScript module associated with the task.
 func (t *NodeTask) Start() error {
-	log.Println("Starting nodejs task...")
+	log.Println("NodeTask.Start() called")
+	
+	// Safety check
+	if t == nil || t.res == nil {
+		return fmt.Errorf("nodejs task: invalid task or resource")
+	}
 
 	// The script content is expected to be in the Cmd field.
+	// If cmd looks like a file path, read the file instead
 	script := t.res.Cmd()
 	if script == "" {
 		return fmt.Errorf("nodejs task: no script provided in cmd field")
+	}
+	
+	log.Printf("NodeTask: script length = %d", len(script))
+	
+	// If script starts with /, treat it as a file path
+	if strings.HasPrefix(script, "/") {
+		log.Printf("nodejs task: reading script from file %s", script)
+		file, err := t.res.ns.Open(script)
+		if err != nil {
+			return fmt.Errorf("nodejs task: failed to open script file %s: %v", script, err)
+		}
+		defer file.Close()
+		
+		data, err := io.ReadAll(file)
+		if err != nil {
+			return fmt.Errorf("nodejs task: failed to read script file %s: %v", script, err)
+		}
+		script = string(data)
 	}
 
 	// Create a new JavaScript context with global object
