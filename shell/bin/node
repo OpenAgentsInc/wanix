@@ -1,0 +1,53 @@
+#!/bin/sh
+
+if [ $# -lt 1 ]; then
+    echo "Usage: node <script.js>" >&2
+    exit 1
+fi
+
+# Read the script file
+SCRIPT_FILE="$1"
+if [ ! -f "$SCRIPT_FILE" ]; then
+    echo "Error: File not found: $SCRIPT_FILE" >&2
+    exit 1
+fi
+
+# Read script content
+SCRIPT_CONTENT=$(cat "$SCRIPT_FILE")
+
+# Create a nodejs task
+TASK_ID=$(cat /task/new/nodejs)
+
+# Set the script as command
+echo "$SCRIPT_CONTENT" > /task/$TASK_ID/cmd
+
+# Start the task
+echo "start" > /task/$TASK_ID/ctl
+
+# Connect task output to our output
+# This runs in background to continuously copy output
+(
+    while true; do
+        cat /task/$TASK_ID/fd/1 2>/dev/null || break
+    done
+) &
+STDOUT_PID=$!
+
+(
+    while true; do
+        cat /task/$TASK_ID/fd/2 2>/dev/null >&2 || break
+    done
+) &
+STDERR_PID=$!
+
+# Wait for task to complete
+cat /task/$TASK_ID/wait >/dev/null 2>&1
+
+# Kill the output copying processes
+kill $STDOUT_PID $STDERR_PID 2>/dev/null
+
+# Get exit code
+EXIT_CODE=$(cat /task/$TASK_ID/exitcode 2>/dev/null || echo "1")
+
+# Exit with same code as nodejs task
+exit $EXIT_CODE

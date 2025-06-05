@@ -27,6 +27,8 @@ func New() *Service {
 	d.Register("ns", func(_ *Resource) error {
 		return nil
 	})
+	// Platform-specific registrations are in service_*.go files
+	registerPlatformTasks(d)
 	return d
 }
 

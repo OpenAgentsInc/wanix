@@ -16,6 +16,7 @@ import (
 	"tractor.dev/wanix/task"
 	"tractor.dev/wanix/web/dom"
 	"tractor.dev/wanix/web/fsa"
+	"tractor.dev/wanix/web/node"
 	"tractor.dev/wanix/web/sw"
 	"tractor.dev/wanix/web/vm"
 	"tractor.dev/wanix/web/worker"
@@ -29,6 +30,7 @@ func New(k *wanix.K, ctx js.Value) fskit.MapFS {
 		"vm":     vm.New(),
 		"worker": workerfs,
 		"opfs":   opfs,
+		"node":   node.New(),
 	}
 	if !ctx.Get("sw").IsUndefined() {
 		webfs["sw"] = sw.Activate(ctx.Get("sw"), k)
