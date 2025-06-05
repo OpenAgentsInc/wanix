@@ -25,6 +25,7 @@ import (
 func New(k *wanix.K, ctx js.Value) fskit.MapFS {
 	workerfs := worker.New(k.Root)
 	opfs, _ := fsa.OPFS()
+	
 	webfs := fskit.MapFS{
 		"dom":    dom.New(k),
 		"vm":     vm.New(),

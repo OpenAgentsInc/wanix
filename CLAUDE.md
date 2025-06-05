@@ -91,3 +91,8 @@ Prerequisites:
 - TinyGo 0.35+ (optional, for smaller WASM)
 
 The `make deps` step builds all external dependencies and only needs to run once. Subsequent builds use `make build`.
+
+## Important Instructions
+
+- NEVER start the Wanix server with `./wanix serve` - the user must do this themselves to avoid tying up the thread
+- Always let the user control server lifecycle
