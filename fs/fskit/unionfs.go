@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 
 	"tractor.dev/wanix/fs"
 )
@@ -97,4 +98,49 @@ func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, err
 	}
 
 	return f, name, nil
+}
+
+// Create creates or truncates the named file.
+func (f UnionFS) Create(name string) (fs.File, error) {
+	ctx := fs.WithOrigin(context.Background(), f, name, "create")
+	return f.CreateContext(ctx, name)
+}
+
+// CreateContext creates or truncates the named file with context.
+func (f UnionFS) CreateContext(ctx context.Context, name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrInvalid}
+	}
+
+	// Try each filesystem in order until one can create
+	for i, fsys := range f {
+		if cfs, ok := fsys.(fs.CreateFS); ok {
+			file, err := cfs.Create(name)
+			if err == nil {
+				return file, nil
+			}
+			// Debug logging for task ctl files
+			if strings.Contains(name, "ctl") {
+				log.Printf("UnionFS.Create[%d]: fsys=%T, name=%q, err=%v", i, fsys, name, err)
+			}
+			// If it's not a "not exist" error, return it
+			if !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+		}
+	}
+
+	// If no filesystem could create, try to open instead
+	// This handles the case where a file already exists
+	for _, fsys := range f {
+		file, err := fs.OpenContext(ctx, fsys, name)
+		if err == nil {
+			return file, nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrNotExist}
 }

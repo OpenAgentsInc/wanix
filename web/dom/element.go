@@ -5,6 +5,7 @@ package dom
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"syscall/js"
@@ -113,6 +114,17 @@ func (r *Element) OpenContext(ctx context.Context, name string) (fs.File, error)
 		})
 	}
 	return fs.OpenContext(ctx, fsys, name)
+}
+
+// Create creates or truncates the named file.
+func (r *Element) Create(name string) (fs.File, error) {
+	// For DOM elements, we support creating control files
+	// by delegating to Open which handles the synthetic files
+	file, err := r.Open(name)
+	if err != nil {
+		log.Printf("Element.Create(%s) failed: %v", name, err)
+	}
+	return file, err
 }
 
 type termDataFile struct {

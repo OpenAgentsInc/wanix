@@ -68,8 +68,8 @@ func WriteFile(fsys FS, filename string, data []byte, perm FileMode) error {
 		var e error
 		f, e = fsys.Open(filename)
 		if errors.Is(e, ErrNotExist) {
-			// ok go back to unsupported error
-			return err //fmt.Errorf("create: %w on %s", ErrNotSupported, reflect.TypeOf(fsys))
+			// The file doesn't exist and Create is not supported
+			return fmt.Errorf("create %s: file does not exist", filename)
 		}
 		if e != nil {
 			return e

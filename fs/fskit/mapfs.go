@@ -2,6 +2,7 @@ package fskit
 
 import (
 	"context"
+	"log"
 	"path"
 	"slices"
 	"strings"
@@ -9,9 +10,18 @@ import (
 	"tractor.dev/wanix/fs"
 )
 
+func getMapKeys(m MapFS) []string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 type MapFS map[string]fs.FS
 
 var _ fs.FS = MapFS(nil)
+var _ fs.CreateFS = MapFS(nil)
 
 func (fsys MapFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
 	subfs, found := fsys[name]
@@ -175,4 +185,47 @@ func (fsys MapFS) OpenContext(ctx context.Context, name string) (fs.File, error)
 		entries = append(entries, nn)
 	}
 	return DirFile(n, entries...), nil
+}
+
+// Create creates or truncates the named file.
+func (fsys MapFS) Create(name string) (fs.File, error) {
+	ctx := fs.WithOrigin(context.Background(), fsys, name, "create")
+	return fsys.CreateContext(ctx, name)
+}
+
+// CreateContext creates or truncates the named file with context.
+func (fsys MapFS) CreateContext(ctx context.Context, name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrInvalid}
+	}
+	
+	// Debug logging
+	if strings.Contains(name, "ctl") {
+		log.Printf("MapFS.CreateContext: name=%q, keys=%v", name, getMapKeys(fsys))
+	}
+
+	// Try exact match first
+	subfs, found := fsys[name]
+	if found {
+		if cfs, ok := subfs.(fs.CreateFS); ok {
+			return cfs.Create(".")
+		}
+		// If the subfs doesn't support Create, try to open it
+		return fs.OpenContext(ctx, subfs, ".")
+	}
+
+	// Try to find a parent filesystem that contains this path
+	for p, subfs := range fsys {
+		if strings.HasPrefix(name, p+"/") {
+			subPath := strings.TrimPrefix(name, p+"/")
+			if cfs, ok := subfs.(fs.CreateFS); ok {
+				return cfs.Create(subPath)
+			}
+			// If create not supported but path matches, try open
+			return fs.OpenContext(ctx, subfs, subPath)
+		}
+	}
+
+	// If we can't find a filesystem that can create this file, fail
+	return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrNotExist}
 }

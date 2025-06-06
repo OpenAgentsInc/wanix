@@ -411,3 +411,57 @@ func (ns *NS) OpenContext(ctx context.Context, name string) (fs.File, error) {
 
 	return fskit.DirFile(fskit.Entry(name, fs.ModeDir|0755), dirEntries...), nil
 }
+
+// Create creates or truncates the named file.
+func (ns *NS) Create(name string) (fs.File, error) {
+	ctx := fs.WithOrigin(ns.ctx, ns, name, "create")
+	return ns.CreateContext(ctx, name)
+}
+
+// CreateContext creates or truncates the named file with context.
+func (ns *NS) CreateContext(ctx context.Context, name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrInvalid}
+	}
+	
+	// Debug logging for task paths
+	if strings.HasPrefix(name, "task/") {
+		log.Printf("NS.CreateContext: name=%q, bindings count=%d", name, len(ns.bindings))
+		for bname := range ns.bindings {
+			log.Printf("  - binding: %q", bname)
+		}
+	}
+
+	// First check if this is a direct binding
+	if refs, exists := ns.bindings[name]; exists && len(refs) > 0 {
+		ref := refs[0] // Use first binding
+		if cfs, ok := ref.fs.(fs.CreateFS); ok {
+			return cfs.Create(ref.path)
+		}
+		// Fall back to open if create not supported
+		return fs.OpenContext(ctx, ref.fs, ref.path)
+	}
+
+	// Check if any binding is a prefix of the requested path
+	for bname, refs := range ns.bindings {
+		if strings.HasPrefix(name, bname+"/") && len(refs) > 0 {
+			ref := refs[0]
+			subPath := path.Join(ref.path, strings.TrimPrefix(name, bname+"/"))
+			
+			// Debug logging for task paths
+			if strings.HasPrefix(name, "task/") {
+				log.Printf("NS.CreateContext: matched binding %q, ref.fs=%T, ref.path=%q, subPath=%q", 
+					bname, ref.fs, ref.path, subPath)
+			}
+			
+			if cfs, ok := ref.fs.(fs.CreateFS); ok {
+				return cfs.Create(subPath)
+			}
+			// Fall back to open if create not supported
+			return fs.OpenContext(ctx, ref.fs, subPath)
+		}
+	}
+
+	// If no binding matches, we can't create the file
+	return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrNotExist}
+}
