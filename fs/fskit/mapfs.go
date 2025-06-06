@@ -25,8 +25,11 @@ var _ fs.CreateFS = MapFS(nil)
 
 func (fsys MapFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
 	// Debug logging for DOM/VM paths
-	if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") {
+	if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") || strings.Contains(name, "1/") {
 		log.Printf("MapFS.ResolveFS: name=%q, keys=%v", name, getMapKeys(fsys))
+		for k, v := range fsys {
+			log.Printf("  MapFS[%q] = %T", k, v)
+		}
 	}
 	
 	subfs, found := fsys[name]
@@ -42,9 +45,13 @@ func (fsys MapFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 	for p := range fsys {
 		keys = append(keys, p)
 	}
-	for _, key := range MatchPaths(keys, name) {
+	matches := MatchPaths(keys, name)
+	if (strings.Contains(name, "/data") || strings.Contains(name, "/ctl") || strings.Contains(name, "1/")) && len(matches) == 0 {
+		log.Printf("MapFS.ResolveFS: NO MATCHES for name=%q in keys=%v", name, keys)
+	}
+	for _, key := range matches {
 		relativePath := strings.Trim(strings.TrimPrefix(name, key), "/")
-		if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") {
+		if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") || strings.Contains(name, "1/") {
 			log.Printf("MapFS.ResolveFS: matched key=%q, relativePath=%q, fsys[key]=%T", key, relativePath, fsys[key])
 		}
 		if rfsys, ok := fsys[key].(fs.ResolveFS); ok {

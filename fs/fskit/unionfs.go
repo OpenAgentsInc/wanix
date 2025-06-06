@@ -54,7 +54,15 @@ func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, err
 	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
 		log.Printf("UnionFS.ResolveFS: name=%q, members=%d", name, len(f))
 		for i, fsys := range f {
-			log.Printf("  - member[%d]: %T", i, fsys)
+			log.Printf("  - member[%d]: %T %p", i, fsys, fsys)
+			// If it's a MapFS, log its keys
+			if mapFS, ok := fsys.(MapFS); ok {
+				var keys []string
+				for k := range mapFS {
+					keys = append(keys, k)
+				}
+				log.Printf("    MapFS keys: %v", keys)
+			}
 		}
 	}
 	
@@ -69,9 +77,12 @@ func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, err
 	}
 
 	var toStat []fs.FS
-	for _, fsys := range f {
+	for i, fsys := range f {
 		if resolver, ok := fsys.(fs.ResolveFS); ok {
 			rfsys, rname, err := resolver.ResolveFS(ctx, name)
+			if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+				log.Printf("  UnionFS: member[%d](%T) ResolveFS returned fsys=%T, name=%q, err=%v", i, fsys, rfsys, rname, err)
+			}
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
 					// certainly does not have name
@@ -81,7 +92,10 @@ func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, err
 			}
 			if !fs.IsReadOnly(ctx) {
 				if _, ok := rfsys.(fs.CreateFS); ok {
-					return rfsys, rname, nil
+					// Only return if the filesystem or name actually changed
+					if rname != name || !fs.Equal(rfsys, fsys) {
+						return rfsys, rname, nil
+					}
 				}
 			}
 			if rname != name || !fs.Equal(rfsys, fsys) {
@@ -90,10 +104,16 @@ func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, err
 			}
 		}
 		toStat = append(toStat, fsys)
+		if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+			log.Printf("  UnionFS: member[%d] added to toStat", i)
+		}
 	}
 
-	for _, fsys := range toStat {
+	for i, fsys := range toStat {
 		_, err := fs.StatContext(ctx, fsys, name)
+		if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+			log.Printf("  UnionFS: toStat[%d](%T) Stat err=%v", i, fsys, err)
+		}
 		if err != nil {
 			continue
 		}

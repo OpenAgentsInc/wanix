@@ -56,7 +56,7 @@ func (d *Service) OpenContext(ctx context.Context, name string) (fs.File, error)
 func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
 	// Debug logging for DOM paths
 	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
-		log.Printf("DOM.ResolveFS: name=%q, resources count=%d", name, len(d.resources))
+		log.Printf("DOM.ResolveFS: name=%q, service=%p, resources count=%d", name, d, len(d.resources))
 		for k := range d.resources {
 			log.Printf("  - resource: %s", k)
 		}
@@ -137,7 +137,7 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 
 						termData: termData,
 					}
-					log.Printf("DOM: Stored element %s (type=%s) in resources map", rid, name)
+					log.Printf("DOM: Stored element %s (type=%s) in resources map, service=%p", rid, name, d)
 					fskit.SetData(n, []byte(rid+"\n"))
 					return nil
 				},
@@ -163,5 +163,30 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 			}, nil
 		}),
 	}
-	return fskit.UnionFS{fsys, fskit.MapFS(d.resources)}, name, nil
+	resourcesMap := fskit.MapFS(d.resources)
+	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+		log.Printf("DOM.ResolveFS: returning UnionFS with static fsys and resources MapFS (count=%d)", len(d.resources))
+		// Log the keys in each MapFS
+		var staticKeys []string
+		for k := range fsys {
+			staticKeys = append(staticKeys, k)
+		}
+		log.Printf("  Static fsys keys: %v", staticKeys)
+		var resourceKeys []string
+		for k := range resourcesMap {
+			resourceKeys = append(resourceKeys, k)
+		}
+		log.Printf("  Resources MapFS keys: %v", resourceKeys)
+		
+	}
+	
+	// Create the UnionFS to return
+	unionFS := fskit.UnionFS{fsys, resourcesMap}
+	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+		log.Printf("  Created UnionFS with %d members", len(unionFS))
+		for i, member := range unionFS {
+			log.Printf("    member[%d] = %T", i, member)
+		}
+	}
+	return unionFS, name, nil
 }
