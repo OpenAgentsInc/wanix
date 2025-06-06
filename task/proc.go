@@ -78,15 +78,44 @@ func (r *Resource) Dir() string {
 }
 
 func (r *Resource) Bind(srcPath, dstPath string) error {
-	return r.ns.Bind(r.ns, srcPath, dstPath, "")
+	// When binding, we need to resolve the source path in the current namespace
+	// to find the actual filesystem to bind from
+	log.Printf("Resource.Bind: srcPath=%q, dstPath=%q", srcPath, dstPath)
+	fsys, resolvedPath, err := fs.Resolve(r.ns, context.Background(), srcPath)
+	if err != nil {
+		log.Printf("Resource.Bind: fs.Resolve failed: %v", err)
+		return err
+	}
+	log.Printf("Resource.Bind: resolved fsys=%T, resolvedPath=%q", fsys, resolvedPath)
+	return r.ns.Bind(fsys, resolvedPath, dstPath, "")
 }
 
 func (r *Resource) Unbind(srcPath, dstPath string) error {
-	return r.ns.Unbind(r.ns, srcPath, dstPath)
+	// Similar to Bind, resolve the source path first
+	fsys, resolvedPath, err := fs.Resolve(r.ns, context.Background(), srcPath)
+	if err != nil {
+		return err
+	}
+	return r.ns.Unbind(fsys, resolvedPath, dstPath)
 }
 
 func (r *Resource) Open(name string) (fs.File, error) {
 	return r.OpenContext(context.Background(), name)
+}
+
+// Create handles file creation for synthetic files within a task.
+// This is necessary to support shell redirections like `> /task/ID/cmd`.
+func (r *Resource) Create(name string) (fs.File, error) {
+	// The files are synthetic, so creating them is the same as opening them for writing.
+	// We only allow this for files that are meant to be writable.
+	switch name {
+	case "cmd", "ctl", "dir", "exit":
+		return r.OpenContext(context.Background(), name)
+	}
+	if strings.HasPrefix(name, "fd/") {
+		return r.OpenContext(context.Background(), name)
+	}
+	return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrPermission}
 }
 
 func (r *Resource) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
