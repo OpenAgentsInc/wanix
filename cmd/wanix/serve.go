@@ -38,7 +38,7 @@ func serveCmd() *cli.Command {
 			if h == "" {
 				h = "localhost"
 			}
-			fmt.Printf("serving on http://%s:%s ...\n", h, p)
+			fmt.Printf("🟢 Wanix Server v23:30 - Fixed VM ttyS0 access\nServing on http://%s:%s ...\n", h, p)
 
 			fsys := fskit.UnionFS{assets.Dir, fskit.MapFS{
 				"v86":   v86.Dir,
