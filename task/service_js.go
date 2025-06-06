@@ -8,13 +8,7 @@ func registerPlatformTasks(d *Service) {
 	// Register the nodejs task type
 	d.Register("nodejs", func(p *Resource) error {
 		// This function is the starter - called when "start" is written to ctl
-		log.Printf("nodejs starter called, cmd: '%s'", p.Cmd())
-		
-		// Workaround: if no cmd is set, check for /tmp/nodejs_script.js
-		if p.Cmd() == "" {
-			log.Println("No cmd set, checking /tmp/nodejs_script.js")
-			p.cmd = "/tmp/nodejs_script.js"
-		}
+		log.Printf("nodejs starter called, cmd length: %d", len(p.Cmd()))
 		
 		nodeTask := NewNodeTask(p)
 		go func() {
