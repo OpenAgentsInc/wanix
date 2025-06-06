@@ -24,12 +24,17 @@ var _ fs.FS = MapFS(nil)
 var _ fs.CreateFS = MapFS(nil)
 
 func (fsys MapFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
+	// Debug logging for DOM/VM paths
+	if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") {
+		log.Printf("MapFS.ResolveFS: name=%q, keys=%v", name, getMapKeys(fsys))
+	}
+	
 	subfs, found := fsys[name]
 	if found {
 		if rfsys, ok := subfs.(fs.ResolveFS); ok {
 			return rfsys.ResolveFS(ctx, ".")
 		}
-		return fsys, name, nil
+		return subfs, ".", nil
 	}
 
 	// check subpaths of map dirs
@@ -39,6 +44,9 @@ func (fsys MapFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 	}
 	for _, key := range MatchPaths(keys, name) {
 		relativePath := strings.Trim(strings.TrimPrefix(name, key), "/")
+		if strings.Contains(name, "/data") || strings.Contains(name, "/ctl") {
+			log.Printf("MapFS.ResolveFS: matched key=%q, relativePath=%q, fsys[key]=%T", key, relativePath, fsys[key])
+		}
 		if rfsys, ok := fsys[key].(fs.ResolveFS); ok {
 			return rfsys.ResolveFS(ctx, relativePath)
 		} else {

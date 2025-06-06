@@ -3,7 +3,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"path"
 )
 
 type ResolveFS interface {
@@ -43,57 +42,32 @@ func ResolveTo[T FS](fsys FS, ctx context.Context, name string) (T, string, erro
 // resolved FS and the relative name for that FS. It uses ResolveFS if
 // available, otherwise it falls back to SubFS. If unable to resolve,
 // it returns the original FS and the original name, but it can also
-// return a PathError if .
+// return a PathError.
 func Resolve(fsys FS, ctx context.Context, name string) (rfsys FS, rname string, err error) {
-	// defer func() {
-	// 	if rname != name {
-	// 		pc2, _, _, _ := runtime.Caller(2)
-	// 		pc3, _, _, _ := runtime.Caller(3)
-	// 		pc4, _, _, _ := runtime.Caller(4)
-	// 		callers := []string{
-	// 			path.Base(runtime.FuncForPC(pc2).Name()),
-	// 			path.Base(runtime.FuncForPC(pc3).Name()),
-	// 			path.Base(runtime.FuncForPC(pc4).Name()),
-	// 		}
-	// 		line := fmt.Sprintf("  [%T] %s => [%T] %s %v %v", fsys, name, rfsys, rname, err, callers)
-	// 		log.Println(strings.ReplaceAll(line, "fskit.", ""))
-	// 	}
-	// }()
-	if rfsys, ok := fsys.(ResolveFS); ok {
-		return rfsys.ResolveFS(ctx, name)
-	}
+	currentFS := fsys
+	currentName := name
 
-	if name == "." {
-		rfsys = fsys
-		rname = name
-		return
-	}
-
-	dirfs, e := Sub(fsys, path.Dir(name))
-	if e != nil {
-		err = e
-		return
-	}
-
-	if Equal(dirfs, fsys) {
-		rfsys = fsys
-		rname = name
-		return
-	}
-
-	if subfs, ok := dirfs.(*SubdirFS); ok {
-		rfsys = subfs.Fsys
-
-		if Equal(subfs.Fsys, fsys) {
-			rname = name
-			return
+	// Loop to handle recursive resolution.
+	for i := 0; i < 100; i++ { // Add a loop limit to prevent infinite recursion
+		resolver, ok := currentFS.(ResolveFS)
+		if !ok {
+			// The current filesystem does not implement ResolveFS, so we're at the leaf.
+			return currentFS, currentName, nil
 		}
 
-		rname, err = subfs.fullName("resolve", path.Base(name))
-		return
-	}
+		nextFS, nextName, err := resolver.ResolveFS(ctx, currentName)
+		if err != nil {
+			return nil, "", err
+		}
 
-	rfsys = dirfs
-	rname = path.Base(name)
-	return
+		// If the filesystem and name haven't changed, resolution has stabilized.
+		if Equal(nextFS, currentFS) && nextName == currentName {
+			return currentFS, currentName, nil
+		}
+
+		// Continue resolving with the new filesystem and path.
+		currentFS = nextFS
+		currentName = nextName
+	}
+	return nil, "", fmt.Errorf("resolution depth exceeded for path: %s", name)
 }

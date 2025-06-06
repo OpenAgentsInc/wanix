@@ -38,7 +38,7 @@ func (d *Service) OpenContext(ctx context.Context, name string) (fs.File, error)
 }
 
 func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
-	return fs.Resolve(fskit.UnionFS{
+	return fskit.UnionFS{
 		fskit.MapFS{
 			"new": fskit.OpenFunc(func(ctx context.Context, name string) (fs.File, error) {
 				if name == "." {
@@ -58,7 +58,7 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 			}),
 		},
 		fskit.MapFS(d.resources),
-	}, ctx, name)
+	}, name, nil
 }
 
 func (d *Service) Alloc(t *task.Resource) (*Resource, error) {

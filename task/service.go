@@ -114,7 +114,7 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 	if ok {
 		m["self"] = internal.FieldFile(t.ID(), nil)
 	}
-	return fs.Resolve(fskit.UnionFS{m, fskit.MapFS(d.resources)}, ctx, name)
+	return fskit.UnionFS{m, fskit.MapFS(d.resources)}, name, nil
 }
 
 func (d *Service) Stat(name string) (fs.FileInfo, error) {

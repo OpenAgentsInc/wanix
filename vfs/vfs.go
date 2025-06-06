@@ -68,86 +68,41 @@ func (ns *NS) Context() context.Context {
 	return ns.ctx
 }
 
+// getKeys is a helper to sort binding keys for deterministic matching.
+func getKeys(m map[string][]bindTarget) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (ns *NS) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
-	// todo: if there is a direct binding by this name, it might also
-	// exist as a subpath of another binding. so this is not correct.
+	// Handle direct bindings first.
 	if refs, ok := ns.bindings[name]; ok {
 		if len(refs) == 1 {
-			// if there is a single binding, return it
+			// A single, non-union binding.
 			return refs[0].fs, refs[0].path, nil
-		} else {
-			if !fs.IsReadOnly(ctx) {
-				for _, ref := range refs {
-					// using CreateFS to find the first writable binding
-					if _, ok := ref.fs.(fs.CreateFS); ok {
-						return ref.fs, ref.path, nil
-					}
-				}
-			}
-			// return the namespace so it can union bindings
-			return ns, name, nil
+		}
+		// A union binding. The namespace itself must handle it.
+		return ns, name, nil
+	}
+
+	// Find the longest matching parent binding path.
+	for _, bindPath := range fskit.MatchPaths(getKeys(ns.bindings), name) {
+		if refs, ok := ns.bindings[bindPath]; ok && len(refs) > 0 {
+			ref := refs[0] // We only resolve into the first filesystem of a union.
+
+			// Calculate the new path relative to the bound filesystem's root.
+			subPath := strings.Trim(strings.TrimPrefix(name, bindPath), "/")
+			newPath := path.Join(ref.path, subPath)
+
+			// Return the next filesystem and the new relative path for further resolution by fs.Resolve.
+			return ref.fs, newPath, nil
 		}
 	}
 
-	// now check subpaths of bindings
-	var bindPaths []string
-	for p := range ns.bindings {
-		bindPaths = append(bindPaths, p)
-	}
-	for _, bindPath := range fskit.MatchPaths(bindPaths, name) {
-		refs := ns.bindings[bindPath]
-		relativeName := strings.Trim(strings.TrimPrefix(name, bindPath), "/")
-		var toStat []bindTarget
-
-		// log.Println("resolve:", bindPath, relativeName, name)
-
-		// first try to resolve the name with ResolveFS
-		for _, ref := range refs {
-			fullName := path.Join(ref.path, relativeName)
-			if resolver, ok := ref.fs.(fs.ResolveFS); ok {
-				rfsys, rname, err := resolver.ResolveFS(ctx, fullName)
-				if err != nil {
-					if errors.Is(err, fs.ErrNotExist) {
-						// certainly does not have name
-						continue
-					}
-					return rfsys, rname, err
-				}
-				if rname != fullName || !fs.Equal(rfsys, ref.fs) {
-					// certainly does have name
-					return rfsys, rname, nil
-				}
-			}
-			// otherwise, we need to stat the name
-			toStat = append(toStat, ref)
-		}
-
-		for _, ref := range toStat {
-			fullName := path.Join(ref.path, relativeName)
-			// log.Println("resolve stat:", reflect.TypeOf(ref.fs), fullName)
-			_, err := fs.StatContext(ctx, ref.fs, fullName)
-			if err != nil {
-				if !errors.Is(err, fs.ErrNotExist) {
-					log.Println("resolve stat:", err)
-				}
-				continue
-			}
-			return ref.fs, fullName, nil
-		}
-
-		if slices.Contains([]string{"create", "mkdir", "symlink"}, fs.Op(ctx)) {
-			// could be a new file (create, mkdir, etc), so check the directory
-			for _, ref := range toStat {
-				fullName := path.Join(ref.path, relativeName)
-				_, err := fs.StatContext(ctx, ref.fs, path.Dir(fullName))
-				if err != nil {
-					continue
-				}
-				return ref.fs, fullName, nil
-			}
-		}
-	}
-
+	// If no binding matched, the path must be resolved from the namespace itself.
 	return ns, name, nil
 }
 

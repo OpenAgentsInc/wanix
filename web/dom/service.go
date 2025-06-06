@@ -4,6 +4,7 @@ package dom
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"strings"
 	"syscall/js"
@@ -53,6 +54,13 @@ func (d *Service) OpenContext(ctx context.Context, name string) (fs.File, error)
 }
 
 func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
+	// Debug logging for DOM paths
+	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+		log.Printf("DOM.ResolveFS: name=%q, resources count=%d", name, len(d.resources))
+		for k := range d.resources {
+			log.Printf("  - resource: %s", k)
+		}
+	}
 	fsys := fskit.MapFS{
 		"new": fskit.OpenFunc(func(ctx context.Context, name string) (fs.File, error) {
 			if name == "." {
@@ -129,6 +137,7 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 
 						termData: termData,
 					}
+					log.Printf("DOM: Stored element %s (type=%s) in resources map", rid, name)
 					fskit.SetData(n, []byte(rid+"\n"))
 					return nil
 				},
@@ -154,5 +163,5 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 			}, nil
 		}),
 	}
-	return fs.Resolve(fskit.UnionFS{fsys, fskit.MapFS(d.resources)}, ctx, name)
+	return fskit.UnionFS{fsys, fskit.MapFS(d.resources)}, name, nil
 }

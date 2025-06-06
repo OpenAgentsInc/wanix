@@ -50,6 +50,14 @@ func (f UnionFS) OpenContext(ctx context.Context, name string) (fs.File, error) 
 }
 
 func (f UnionFS) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
+	// Debug logging
+	if strings.Contains(name, "data") || strings.Contains(name, "ctl") {
+		log.Printf("UnionFS.ResolveFS: name=%q, members=%d", name, len(f))
+		for i, fsys := range f {
+			log.Printf("  - member[%d]: %T", i, fsys)
+		}
+	}
+	
 	if len(f) == 0 {
 		return nil, "", &fs.PathError{Op: "resolve", Path: name, Err: fs.ErrNotExist}
 	}

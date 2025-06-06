@@ -39,7 +39,7 @@ func (d *Service) Register(kind string, alloc Allocator) {
 }
 
 func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, error) {
-	return fs.Resolve(fskit.UnionFS{fskit.MapFS{
+	return fskit.UnionFS{fskit.MapFS{
 		"ctl": fskit.OpenFunc(func(ctx context.Context, name string) (fs.File, error) {
 			return fskit.Entry(name, 0555, []byte("ctl\n")).Open(".")
 		}),
@@ -77,7 +77,7 @@ func (d *Service) ResolveFS(ctx context.Context, name string) (fs.FS, string, er
 				},
 			}, nil
 		}),
-	}, fskit.MapFS(d.resources)}, ctx, name)
+	}, fskit.MapFS(d.resources)}, name, nil
 }
 
 func (d *Service) Open(name string) (fs.File, error) {

@@ -60,7 +60,7 @@ func serveCmd() *cli.Command {
 
 				http.FileServerFS(fsys).ServeHTTP(w, r)
 			}))
-			log.Printf("Server v21:45 - Added debug logging to Resource.Bind.\n")
+			log.Printf("Server v22:10 - Fixed all service ResolveFS methods to return UnionFS directly.\n")
 			if err := http.ListenAndServe(listenAddr, nil); err != nil {
 				log.Fatal("Server error:", err)
 			}
