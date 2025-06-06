@@ -96,3 +96,4 @@ The `make deps` step builds all external dependencies and only needs to run once
 
 - NEVER start the Wanix server with `./wanix serve` - the user must do this themselves to avoid tying up the thread
 - Always let the user control server lifecycle
+- ALWAYS update the server version string in `cmd/wanix/serve.go` when making changes so the user knows they're running the latest version (e.g., "Server v21:00 - Added debug logging")

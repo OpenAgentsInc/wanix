@@ -60,7 +60,7 @@ func serveCmd() *cli.Command {
 
 				http.FileServerFS(fsys).ServeHTTP(w, r)
 			}))
-			log.Printf("Server listening. Check browser console (F12) for debug output.\n")
+			log.Printf("Server v21:45 - Added debug logging to Resource.Bind.\n")
 			if err := http.ListenAndServe(listenAddr, nil); err != nil {
 				log.Fatal("Server error:", err)
 			}
